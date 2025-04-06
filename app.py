@@ -12,8 +12,8 @@ def chunk_text(text, chunk_size=1900):
 
 @app.route("/notion-webhook", methods=["POST"])
 def run_assistant():
-    notion = Client(auth="NOTION_API_KEY")
-    client = OpenAI(api_key="OPENAI_API_KEY")
+    notion = Client(auth=os.environ["NOTION_API_KEY"])
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
     # Step 1: Query Notion for rows with Status = Ready
     results = notion.databases.query(
