@@ -113,7 +113,9 @@ def run_assistant():
             )
 
         except Exception as e:
+            import traceback
             print(f"❌ Failed to process page '{title}':", e)
+            traceback.print_exc()
             notion.pages.update(
                 page_id=page["id"],
                 properties={
