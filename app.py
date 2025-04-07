@@ -4,29 +4,58 @@ from notion_client import Client
 import requests
 import os
 from openai import OpenAI
+from threading import Thread
 
 app = Flask(__name__)
 
 def chunk_text(text, chunk_size=1900):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
+DEFAULT_PROMPT = (
+    "Your task is to extract obligations that the document places on Lightyears. "
+    "For each obligation, return the following fields in a readable, plain text format. "
+    "Do not use tables or markdown. Use a consistent structure with one obligation per block. "
+    "Format each obligation like this:\n\n"
+    "🔹 Clause: [Clause reference]\n"
+    "• Type: [Type: Trivial, Consult on Event, Scheduled, Conditional]\n"
+    "• Trigger: [Trigger if any]\n"
+    "• Action: [Action we must take]\n"
+    "• Frequency: [How often]\n"
+    "• Notes: [Additional notes]\n"
+    "• Status: [Captured, Needs review, Unclear]\n\n"
+    "Please return each obligation using this format, separated by two new lines."
+)
+
 @app.route("/notion-webhook", methods=["POST"])
 def run_assistant():
+    Thread(target=process_ready_rows).start()
+    return jsonify({"status": "queued"}), 200
+
+def process_ready_rows():
     notion = Client(auth=os.environ["NOTION_API_KEY"])
     client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-    # Step 1: Query Notion for rows with Status = Ready
     results = notion.databases.query(
         database_id="1cb596796eb480e69b76e1c9da8aa7c6",
         filter={"property": "Status", "select": {"equals": "Ready"}}
     )
 
     for page in results["results"]:
+        page_id = page["id"]
         props = page["properties"]
         title = props["Name"]["title"][0]["text"]["content"]
         files = props["Document"]["files"]
 
         if not files:
+            continue
+
+        try:
+            notion.pages.update(
+                page_id=page_id,
+                properties={"Status": {"select": {"name": "Running"}}}
+            )
+        except Exception as e:
+            print(f"❌ Could not mark '{title}' as Running:", e)
             continue
 
         file_obj = files[0]
@@ -37,21 +66,11 @@ def run_assistant():
             with open("temp.pdf", "wb") as f:
                 f.write(response.content)
 
-            # Assistant prompt
-            prompt = (
-                "Your task is to extract obligations that the document places on Lightyears. "
-                "For each obligation, return the following fields in a readable, plain text format. "
-                "Do not use tables or markdown. Use a consistent structure with one obligation per block. "
-                "Format each obligation like this:\n\n"
-                "🔹 Clause: [Clause reference]\n"
-                "• Type: [Type: Trivial, Consult on Event, Scheduled, Conditional]\n"
-                "• Trigger: [Trigger if any]\n"
-                "• Action: [Action we must take]\n"
-                "• Frequency: [How often]\n"
-                "• Notes: [Additional notes]\n"
-                "• Status: [Captured, Needs review, Unclear]\n\n"
-                "Please return each obligation using this format, separated by two new lines."
-            )
+            # Use custom prompt if provided, otherwise fallback to default
+            if props.get("Instructions") and props["Instructions"].get("rich_text"):
+                prompt = props["Instructions"]["rich_text"][0]["text"]["content"]
+            else:
+                prompt = DEFAULT_PROMPT
 
             uploaded_file = client.files.create(file=open("temp.pdf", "rb"), purpose="assistants")
             response = client.responses.create(
@@ -70,19 +89,16 @@ def run_assistant():
             output = response.output_text.strip()
             chunks = chunk_text(output)
 
-            # Write result to Notion (Status)
             notion.pages.update(
-                page_id=page["id"],
+                page_id=page_id,
                 properties={
-                    "Status": {
-                        "select": {
-                            "name": "Complete"
-                        }
+                    "Status": {"select": {"name": "Complete"}},
+                    "Raw result": {
+                        "rich_text": [{"type": "text", "text": {"content": chunk}} for chunk in chunks]
                     }
                 }
             )
 
-            # Append readable output to the Notion page
             paragraph_blocks = [
                 {
                     "object": "block",
@@ -98,7 +114,7 @@ def run_assistant():
             ]
 
             notion.blocks.children.append(
-                block_id=page["id"],
+                block_id=page_id,
                 children=[
                     {
                         "object": "block",
@@ -118,13 +134,9 @@ def run_assistant():
             print(f"❌ Failed to process page '{title}':", e)
             traceback.print_exc()
             notion.pages.update(
-                page_id=page["id"],
-                properties={
-                    "Status": {"select": {"name": "Failed"}}
-                }
+                page_id=page_id,
+                properties={"Status": {"select": {"name": "Failed"}}}
             )
-
-    return jsonify({"status": "complete"}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
