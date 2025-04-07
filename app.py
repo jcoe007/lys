@@ -74,7 +74,10 @@ def run_assistant():
             notion.pages.update(
                 page_id=page["id"],
                 properties={
-                    "Status": {"select": {"name": "Complete"}},
+                    "Status": {
+                        "select": {
+                            "name": "Complete"
+                        }
                     }
                 }
             )
