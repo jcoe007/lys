@@ -70,13 +70,11 @@ def run_assistant():
             output = response.output_text.strip()
             chunks = chunk_text(output)
 
-            # Write result to Notion (Raw result + Status)
+            # Write result to Notion (Status)
             notion.pages.update(
                 page_id=page["id"],
                 properties={
                     "Status": {"select": {"name": "Complete"}},
-                    "Raw result": {
-                        "rich_text": [{"type": "text", "text": {"content": chunk}} for chunk in chunks]
                     }
                 }
             )
