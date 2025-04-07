@@ -92,10 +92,7 @@ def process_ready_rows():
             notion.pages.update(
                 page_id=page_id,
                 properties={
-                    "Status": {"select": {"name": "Complete"}},
-                    "Raw result": {
-                        "rich_text": [{"type": "text", "text": {"content": chunk}} for chunk in chunks]
-                    }
+                    "Status": {"select": {"name": "Complete"}}
                 }
             )
 
