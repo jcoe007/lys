@@ -12,17 +12,14 @@ def chunk_text(text, chunk_size=1900):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
 DEFAULT_PROMPT = (
-    "Your task is to extract obligations that the document places on Lightyears. "
-    "For each obligation, return the following fields in a readable, plain text format. "
-    "Do not use tables or markdown. Use a consistent structure with one obligation per block. "
-    "Format each obligation like this:\n\n"
-    "🔹 Clause: [Clause reference]\n"
-    "• Type: [Type: Trivial, Consult on Event, Scheduled, Conditional]\n"
-    "• Trigger: [Trigger if any]\n"
-    "• Action: [Action we must take]\n"
-    "• Frequency: [How often]\n"
-    "• Notes: [Additional notes]\n"
-    "• Status: [Captured, Needs review, Unclear]\n\n"
+    "Your task is to extract obligations that the document places on parties, particularly Lightyears. Our goal is to then actively track our obligations, creating specific tasks as needed. For each obligation, return the following fields in a readable, plain text format. Do not use tables or markdown. Use a consistent structure with one obligation per block. Format each obligation in a list like this:"
+    "Clause: [Clause reference]"
+    "Party: [Which party this obligation falls on]"
+    "Trigger: [Trigger event, if Conditional]"
+    "Timing: [When the action should take place, if Scheduled]"
+    "Frequency: [How often, if Scheduled]"
+    "Action: [Action that the party must take, in detail]"
+    "Notes: [Additional notes if the above does not fully capture the obligation. Mention here if you feel anything in the obligation is unclear or warrants human comprehension.]"
     "Please return each obligation using this format, separated by two new lines."
 )
 
