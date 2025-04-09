@@ -70,8 +70,9 @@ def process_ready_rows():
                 prompt = DEFAULT_PROMPT
 
             uploaded_file = client.files.create(file=open("temp.pdf", "rb"), purpose="assistants")
+            model = props.get("Model", {}).get("select", {}).get("name", "gpt-4o")
             response = client.responses.create(
-                model="gpt-4o",
+                model=model,
                 input=[
                     {
                         "role": "user",
